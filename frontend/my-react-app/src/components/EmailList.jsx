@@ -155,6 +155,11 @@ function EmailList({ emails, selectedEmail, onSelectEmail }) {
               </div>
 
               <div className="email-item-right">
+                {email.label && (
+                  <span className={`email-label label-${email.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {email.label}
+                  </span>
+                )}
                 <span className="email-date">{formatDate(email.date)}</span>
               </div>
             </div>

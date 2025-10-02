@@ -10,7 +10,7 @@ function App() {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('inbox');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -44,13 +44,25 @@ function App() {
   };
 
   const filteredEmails = emails.filter(email => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      email.subject?.toLowerCase().includes(query) ||
-      email.from?.toLowerCase().includes(query) ||
-      email.body?.toLowerCase().includes(query)
-    );
+    // Filter by label/category
+    let matchesCategory = true;
+    if (selectedCategory !== 'all') {
+      matchesCategory = email.label === selectedCategory;
+    }
+
+    // Filter by search query
+    let matchesSearch = true;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      matchesSearch = (
+        email.subject?.toLowerCase().includes(query) ||
+        email.from?.toLowerCase().includes(query) ||
+        email.body?.toLowerCase().includes(query) ||
+        email.body_text?.toLowerCase().includes(query)
+      );
+    }
+
+    return matchesCategory && matchesSearch;
   });
 
   if (loading) {
@@ -67,7 +79,8 @@ function App() {
       
       <div className="main-container">
         <Sidebar 
-          selectedCategory={selectedCategory} 
+          selectedCategory={selectedCategory}
+          emails={emails}
           onCategoryChange={(category) => {
             setSelectedCategory(category);
             setSelectedEmail(null); // Clear selection when changing category
