@@ -294,6 +294,20 @@ body {
   opacity: 0.1;
 }
 
+.icon-btn.active {
+  border-color: var(--border-accent);
+  color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.icon-btn.active::before {
+  opacity: 0.15;
+}
+
+.user-avatar-container {
+  position: relative;
+}
+
 .user-avatar {
   width: 44px;
   height: 44px;
@@ -314,6 +328,12 @@ body {
 .user-avatar:hover {
   transform: translateY(-2px) scale(1.05);
   box-shadow: var(--shadow-glow);
+}
+
+.user-avatar.active {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-glow-lg);
+  border: 2px solid var(--border-accent);
 }
 
 /* ==================== MAIN CONTAINER ==================== */

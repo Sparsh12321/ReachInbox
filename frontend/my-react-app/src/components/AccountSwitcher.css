@@ -1,0 +1,232 @@
+.account-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 320px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  z-index: 1000;
+  animation: slideDown 0.2s ease;
+  overflow: hidden;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Section Styles */
+.account-section {
+  padding: 12px;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+/* Account Item */
+.account-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.account-item:hover {
+  background: var(--bg-hover);
+}
+
+.account-item.current {
+  cursor: default;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-accent);
+}
+
+.account-item.current:hover {
+  background: var(--bg-tertiary);
+}
+
+.account-item.active {
+  background: var(--bg-hover);
+}
+
+/* Account Avatar */
+.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+  border: 2px solid var(--border-primary);
+  transition: all 0.2s ease;
+}
+
+.account-avatar.active {
+  background: var(--accent-gradient);
+  color: white;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.account-item:hover .account-avatar {
+  border-color: var(--border-hover);
+  transform: scale(1.05);
+}
+
+/* Account Info */
+.account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active Badge */
+.active-badge {
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(88, 166, 255, 0.1);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.active-indicator {
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Divider */
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-primary);
+  margin: 0;
+}
+
+/* Accounts List */
+.accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* Custom Scrollbar */
+.accounts-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.accounts-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.accounts-list::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 3px;
+}
+
+.accounts-list::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Add Account Button */
+.add-account-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--accent-gradient);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(88, 166, 255, 0.3);
+}
+
+.add-account-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.4);
+}
+
+.add-account-btn:active {
+  transform: translateY(0);
+}
+
+.add-account-btn svg {
+  flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .account-switcher-dropdown {
+    width: 280px;
+    right: -10px;
+  }
+
+  .account-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+
+  .account-name {
+    font-size: 13px;
+  }
+
+  .account-email {
+    font-size: 11px;
+  }
+}
+

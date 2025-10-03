@@ -1,109 +1,113 @@
 import './App.css';
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import Navbar from "./components/Navbar";
-import Sidebar from "./components/Sidebar";
-import EmailList from "./components/EmailList";
-import EmailDetail from "./components/EmailDetail";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Provider as ReduxProvider } from 'react-redux';
+import { store } from './store/store';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import HomePage from './pages/HomePage';
+import { useAuth } from './hooks/useAuth';
 
-function App() {
-  const [emails, setEmails] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedEmail, setSelectedEmail] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+// ============================================
+// 🔧 DEVELOPMENT MODE - Toggle Login State
+// ============================================
+// 
+// Since there's no login API yet, use this variable to control authentication:
+//
+// DEV_MODE_SKIP_AUTH = true  → Skip authentication, go directly to /home
+// DEV_MODE_SKIP_AUTH = false → Require login through /login page
+//
+// Usage:
+// 1. Set to `true` to work on the main app without logging in
+// 2. Set to `false` when you want to test the login/register flow
+// 3. Once you have a real API, set to `false` and remove this variable
+//
+const DEV_MODE_SKIP_AUTH = true;
 
-  useEffect(() => {
-    async function fetchEmails() {
-      try {
-        const res = await axios.get("http://localhost:3000/emails");
-        setEmails(res.data.emails || []);
-      } catch (err) {
-        console.error("Failed to fetch emails:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
-    fetchEmails();
-
-    const interval = setInterval(fetchEmails, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-  };
-
-  const handleSelectEmail = (idx) => {
-    setSelectedEmail(idx);
-  };
-
-  const handleCloseEmail = () => {
-    setSelectedEmail(null);
-  };
-
-  const filteredEmails = emails.filter(email => {
-    // Filter by label/category
-    let matchesCategory = true;
-    if (selectedCategory !== 'all') {
-      matchesCategory = email.label === selectedCategory;
-    }
-
-    // Filter by search query
-    let matchesSearch = true;
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      matchesSearch = (
-        email.subject?.toLowerCase().includes(query) ||
-        email.from?.toLowerCase().includes(query) ||
-        email.body?.toLowerCase().includes(query) ||
-        email.body_text?.toLowerCase().includes(query)
-      );
-    }
-
-    return matchesCategory && matchesSearch;
-  });
-
-  if (loading) {
+// Protected Route Component
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // In dev mode, skip authentication check
+  if (DEV_MODE_SKIP_AUTH) {
+    return children;
+  }
+  
+  if (isLoading) {
     return (
       <div className="loading-container">
-        <p>Loading emails...</p>
+        <p>Loading...</p>
       </div>
     );
   }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+}
 
+function AppRoutes() {
   return (
-    <div className="app-container">
-      <Navbar onSearch={handleSearch} />
-      
-      <div className="main-container">
-        <Sidebar 
-          selectedCategory={selectedCategory}
-          emails={emails}
-          onCategoryChange={(category) => {
-            setSelectedCategory(category);
-            setSelectedEmail(null); // Clear selection when changing category
-          }}
+    <Router>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        {/* Protected Routes */}
+        <Route 
+          path="/home" 
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          } 
         />
         
-        <div className="content-area">
-          {selectedEmail === null ? (
-            <EmailList 
-              emails={filteredEmails}
-              selectedEmail={selectedEmail}
-              onSelectEmail={handleSelectEmail}
-            />
-          ) : (
-            <EmailDetail 
-              email={filteredEmails[selectedEmail]}
-              onClose={handleCloseEmail}
-              onBack={handleCloseEmail}
-            />
-          )}
-        </div>
-      </div>
-    </div>
+        {/* Default Route */}
+        <Route 
+          path="/" 
+          element={<Navigate to={DEV_MODE_SKIP_AUTH ? "/home" : "/login"} replace />} 
+        />
+      </Routes>
+    </Router>
+  );
+}
+
+function App() {
+  // Log dev mode status
+  React.useEffect(() => {
+    if (DEV_MODE_SKIP_AUTH) {
+      console.log(
+        '%c🔧 DEV MODE: Authentication is bypassed',
+        'background: #4CAF50; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold;'
+      );
+      console.log(
+        '%cTo enable authentication, set DEV_MODE_SKIP_AUTH to false in App.jsx',
+        'color: #666; font-style: italic;'
+      );
+    }
+  }, []);
+
+  return (
+    <ReduxProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <AppRoutes />
+      </QueryClientProvider>
+    </ReduxProvider>
   );
 }
 

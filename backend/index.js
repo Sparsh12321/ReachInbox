@@ -5,7 +5,7 @@ const { classifyEmail, loadClassifier } = require("./utils/classifier");
 const cors = require("cors");
 const crypto = require("crypto");
 const { htmlToText } = require("html-to-text");
-const Account = require("./models/Account"); // Mongo model
+const Account = require("./models/user"); // Mongo model
 
 require("dotenv").config();
 
