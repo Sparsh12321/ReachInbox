@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useAuth } from '../hooks/useAuth';
 import { addAccountToList, setActiveAccount } from '../store/slices/accountsSlice';
@@ -8,6 +8,8 @@ import './Auth.css';
 function Login() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const isAddingAccount = searchParams.get('addAccount') === 'true';
   const { login, isLoggingIn, loginError, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
@@ -15,12 +17,12 @@ function Login() {
   });
   const [errors, setErrors] = useState({});
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but not when adding a new account)
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isAddingAccount) {
       navigate('/home');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, isAddingAccount]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -91,7 +93,7 @@ function Login() {
       <div className="auth-card">
         <div className="auth-header">
           <h1>ReachInbox</h1>
-          <p>Welcome back! Please login to your account.</p>
+          <p>{isAddingAccount ? 'Add a new account to your workspace.' : 'Welcome back! Please login to your account.'}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -147,12 +149,12 @@ function Login() {
           </div>
 
           <button type="submit" className="auth-button" disabled={isLoggingIn}>
-            {isLoggingIn ? 'Logging in...' : 'Login'}
+            {isLoggingIn ? (isAddingAccount ? 'Adding Account...' : 'Logging in...') : (isAddingAccount ? 'Add Account' : 'Login')}
           </button>
         </form>
 
         <div className="auth-switch">
-          Don't have an account? <Link to="/register">Sign up</Link>
+          Don't have an account? <Link to={isAddingAccount ? "/register?addAccount=true" : "/register"}>Sign up</Link>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { store } from './store/store';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import HomePage from './pages/HomePage';
+import TestEmails from './pages/TestEmails';
 import { useAuth } from './hooks/useAuth';
 
 // ============================================
@@ -66,6 +67,7 @@ function AppRoutes() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/test-emails" element={<TestEmails />} />
         
         {/* Protected Routes */}
         <Route 

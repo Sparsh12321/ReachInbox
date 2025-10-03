@@ -44,16 +44,45 @@ async function fetchEmails({ imap_user, imap_pass, lastUid = null }) {
 
   const lock = await client.getMailboxLock("INBOX");
   try {
-    const searchCriteria = lastUid ? { uid: `${lastUid + 1}:*` } : { since: new Date(Date.now() - 30 * DAY_MS) };
-    const uids = await client.search(searchCriteria);
+    let uids = [];
+    
+    if (lastUid) {
+      // Incremental fetch: get only new emails after lastUid
+      console.log(`🔍 Searching for emails with UID > ${lastUid}`);
+      uids = await client.search({ uid: `${lastUid + 1}:*` });
+    } else {
+      // Initial fetch: try to get emails from last 30 days
+      console.log(`🔍 Searching for emails from last 30 days`);
+      const thirtyDaysAgo = new Date(Date.now() - 0.1 * DAY_MS);
+      uids = await client.search({ since: thirtyDaysAgo });
+      
+      // If no emails in last 30 days, fetch the most recent 50 emails
+      if (uids.length === 0) {
+        console.log(`📭 No emails found in last 30 days, fetching most recent 50 emails...`);
+        const mailbox = await client.mailboxOpen("INBOX");
+        const totalMessages = mailbox.exists;
+        
+        if (totalMessages > 0) {
+          const startSeq = Math.max(1, totalMessages - 49); // Get last 50 emails
+          uids = await client.search({ seq: `${startSeq}:*` });
+        }
+      }
+    }
+    
+    console.log(`📬 Found ${uids.length} email UIDs in INBOX`);
 
     if (uids.length > 0) {
+      console.log(`📥 Fetching ${uids.length} emails...`);
       for await (let msg of client.fetch(uids, { source: true })) {
         const parsed = await simpleParser(msg.source);
         const email = formatEmail(parsed);
         email.uid = msg.uid;
+        email.messageId = parsed.messageId || `${msg.uid}@${imap_user}`;
         emails.push(email);
       }
+      console.log(`✅ Successfully fetched and parsed ${emails.length} emails`);
+    } else {
+      console.log(`📭 Inbox appears to be empty`);
     }
   } finally {
     lock.release();

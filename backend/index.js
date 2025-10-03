@@ -31,6 +31,8 @@ async function ensureIndex() {
             date: { type: "date" },
             messageId: { type: "keyword" },
             label: { type: "keyword" },
+            account_id: { type: "keyword" },
+            imap_user: { type: "keyword" },
           },
         },
       },
@@ -61,12 +63,14 @@ async function pollNewEmails() {
   if (!activeAccount) return; // no logged-in account
 
   try {
+    console.log(`🔄 Polling emails for ${activeAccount.imap_user} (lastUid: ${lastUid || 'initial fetch'})`);
     const { emails, lastUid: newUid } = await fetchEmails({
       imap_user: activeAccount.imap_user,
       imap_pass: activeAccount.imap_pass,
       lastUid,
     });
 
+    console.log(`📧 Fetched ${emails.length} emails from IMAP`);
     lastUid = newUid;
 
     const enrichedEmails = emails.map((email) => {
@@ -82,9 +86,17 @@ async function pollNewEmails() {
         }
       }
 
-      const emailId = crypto.createHash("md5").update((email.subject || "") + (email.date || "")).digest("hex");
+      const emailId = crypto.createHash("md5").update((email.subject || "") + (email.date || "") + activeAccount.imap_user).digest("hex");
 
-      return { ...email, _id: emailId, body_html: bodyHtml, body_text: bodyText, label };
+      return { 
+        ...email, 
+        _id: emailId, 
+        body_html: bodyHtml, 
+        body_text: bodyText, 
+        label,
+        account_id: activeAccount._id.toString(),
+        imap_user: activeAccount.imap_user
+      };
     });
 
     if (enrichedEmails.length > 0) {
@@ -98,11 +110,15 @@ async function pollNewEmails() {
           date: email.date,
           messageId: email.messageId,
           label: email.label,
+          account_id: email.account_id,
+          imap_user: email.imap_user
         }
       ]);
 
       await esClient.bulk({ refresh: true, body: bulkOps });
       console.log(`✅ Indexed ${enrichedEmails.length} new emails for ${activeAccount.imap_user}`);
+    } else {
+      console.log(`📭 No new emails found for ${activeAccount.imap_user}`);
     }
   } catch (err) {
     console.error("❌ Failed to poll new emails:", err.message);
@@ -131,6 +147,7 @@ app.post("/login", async (req, res) => {
   res.json({ message: `Active account set to ${imap_user}`, account });
 
   // Start polling for this account immediately
+  console.log(`🚀 Starting initial email fetch for ${imap_user}`);
   pollNewEmails();
 });
 
@@ -140,26 +157,94 @@ setInterval(pollNewEmails, 60 * 1000);
 
 // --- API: Search emails ---
 app.get("/search", async (req, res) => {
-  const { q } = req.query;
+  const { q, account_id } = req.query;
   if (!q) return res.status(400).json({ error: "Query missing" });
 
   try {
-    const result = await esClient.search({
-      index: "emails",
-      query: {
+    console.log(`🔍 Search request received for query: "${q}", account: ${account_id || 'all'}`);
+    
+    // Build query with account filter
+    let query;
+    
+    if (q === '*' || q === 'from:*') {
+      // Match all, but filter by account if provided
+      if (account_id) {
+        query = {
+          bool: {
+            must: { match_all: {} },
+            filter: { term: { account_id } }
+          }
+        };
+      } else {
+        query = { match_all: {} };
+      }
+    } else {
+      // Text search with optional account filter
+      const textQuery = {
         multi_match: {
           query: q,
           fields: ["from", "subject", "body_text", "label"],
           fuzziness: "AUTO",
-        },
-      },
+        }
+      };
+      
+      if (account_id) {
+        query = {
+          bool: {
+            must: textQuery,
+            filter: { term: { account_id } }
+          }
+        };
+      } else {
+        query = textQuery;
+      }
+    }
+
+    console.log('🔎 Fetching emails from Elasticsearch with account filter...');
+    const result = await esClient.search({
+      index: "emails",
+      body: {
+        query,
+        size: 1000,
+        sort: [{ date: { order: "desc" } }]
+      }
     });
 
     const hits = result.hits.hits.map(hit => hit._source);
+    console.log(`✅ Search returned ${hits.length} emails for account ${account_id || 'all'}`);
     res.json({ emails: hits });
   } catch (err) {
     console.error("❌ Search failed:", err.message);
-    res.status(500).json({ error: "Search failed" });
+    console.error("Full error:", err);
+    res.status(500).json({ error: "Search failed", details: err.message });
+  }
+});
+
+// --- API: Debug - Get ES stats ---
+app.get("/debug/emails-count", async (req, res) => {
+  try {
+    const count = await esClient.count({ index: "emails" });
+    const sample = await esClient.search({
+      index: "emails",
+      body: {
+        query: { match_all: {} },
+        size: 5,
+        sort: [{ date: { order: "desc" } }]
+      }
+    });
+    
+    res.json({ 
+      total: count.count,
+      sampleEmails: sample.hits.hits.map(hit => ({
+        from: hit._source.from,
+        subject: hit._source.subject,
+        date: hit._source.date,
+        label: hit._source.label
+      }))
+    });
+  } catch (err) {
+    console.error("❌ Failed to get ES stats:", err.message);
+    res.status(500).json({ error: "Failed to get stats" });
   }
 });
 
@@ -186,6 +271,7 @@ app.post("/switch-account", async (req, res) => {
     console.log(`✅ Switched to account: ${account.imap_user}`);
 
     // Immediately poll for new emails for this account
+    console.log(`🚀 Starting email fetch after account switch to ${account.imap_user}`);
     pollNewEmails();
 
     res.json({ message: `Active account set to ${account.imap_user}`, account });

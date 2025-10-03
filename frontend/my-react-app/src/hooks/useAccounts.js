@@ -25,6 +25,11 @@ export const useAccounts = () => {
       dispatch(setActiveAccount(accountId));
       // Invalidate emails query to refetch for new account
       queryClient.invalidateQueries(['emails']);
+      // Refetch after a delay to allow backend to index emails
+      setTimeout(() => {
+        console.log('🔄 Refetching emails after account switch...');
+        queryClient.invalidateQueries(['emails']);
+      }, 2000);
       console.log('✅ Switched account:', data.message);
     },
     onError: (error) => {

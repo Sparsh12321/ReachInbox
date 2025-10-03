@@ -23,6 +23,17 @@ function HomePage() {
   useEffect(() => {
     refetchAccounts();
   }, [refetchAccounts]);
+
+  // Refetch emails after initial mount to catch newly indexed emails
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log('🔄 Refetching emails after delay...');
+      refetchEmails();
+    }, 3000); // Wait 3 seconds for backend to index emails
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
   
   // Redux state (client state)
   const { selectedEmailIndex, selectedCategory, searchQuery } = useSelector(
@@ -31,21 +42,39 @@ function HomePage() {
   const { autoRefresh, refreshInterval } = useSelector(
     (state) => state.userPreferences
   );
+  const activeAccountId = useSelector((state) => state.accounts.activeAccountId);
 
   // Tanstack Query for server state
-  const { data: emails = [], isLoading: loading } = useQuery({
-    queryKey: ['emails'],
+  const { data: emails = [], isLoading: loading, error: emailError, refetch: refetchEmails } = useQuery({
+    queryKey: ['emails', activeAccountId],
     queryFn: async () => {
-      // Use search endpoint with wildcard to get all emails
-      const res = await axios.get("http://localhost:3000/search", {
-        params: { q: '*' }
-      });
-      return res.data.emails || [];
+      try {
+        const params = { q: '*' };
+        if (activeAccountId) {
+          params.account_id = activeAccountId;
+        }
+        
+        console.log('📧 Fetching emails for account:', activeAccountId || 'all');
+        const res = await axios.get("http://localhost:3000/search", { params });
+        console.log('📧 Loaded emails:', res.data.emails?.length || 0);
+        return res.data.emails || [];
+      } catch (error) {
+        console.error('❌ Failed to fetch emails:', error);
+        throw error;
+      }
     },
     refetchInterval: autoRefresh ? refreshInterval : false,
-    staleTime: 10000,
-    retry: 1,
+    staleTime: 5000,
+    retry: 2,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    enabled: true, // Always enabled, but filters by account
   });
+
+  // Log when emails change
+  useEffect(() => {
+    console.log('Current emails count:', emails.length);
+  }, [emails]);
 
   const handleSearch = (query) => {
     dispatch(setSearchQuery(query));
@@ -85,10 +114,23 @@ function HomePage() {
     return matchesCategory && matchesSearch;
   });
 
-  if (loading) {
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Filter Debug:', {
+      totalEmails: emails.length,
+      selectedCategory,
+      searchQuery,
+      filteredCount: filteredEmails.length
+    });
+  }, [emails, selectedCategory, searchQuery, filteredEmails.length]);
+
+  if (emailError) {
     return (
       <div className="loading-container">
-        <p>Loading emails...</p>
+        <p style={{ color: 'var(--error)' }}>Error loading emails: {emailError.message}</p>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '20px' }}>
+          Retry
+        </button>
       </div>
     );
   }
@@ -105,7 +147,33 @@ function HomePage() {
         />
         
         <div className="content-area">
-          {selectedEmailIndex === null ? (
+          {loading ? (
+            <div className="loading-container">
+              <p>Loading emails...</p>
+            </div>
+          ) : filteredEmails.length === 0 ? (
+            <div className="loading-container">
+              <p>No emails found</p>
+              <button 
+                onClick={() => refetchEmails()} 
+                style={{ 
+                  marginTop: '20px',
+                  padding: '10px 20px',
+                  background: 'var(--accent-gradient)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Refresh Emails
+              </button>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                Try selecting "All Emails" or refresh
+              </p>
+            </div>
+          ) : selectedEmailIndex === null ? (
             <EmailList 
               emails={filteredEmails}
               selectedEmail={selectedEmailIndex}

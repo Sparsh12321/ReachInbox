@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-mongoose.connect("mongodb://localhost:27017/reachinbox").then(() => {
+mongoose.connect("mongodb+srv://garvitadlakha08:Complex08@cluster0.5oxq0.mongodb.net/reachinbox").then(() => {
   console.log("✅ Connected to MongoDB");
 }).catch(err => {
   console.error("❌ MongoDB connection error:", err.message);

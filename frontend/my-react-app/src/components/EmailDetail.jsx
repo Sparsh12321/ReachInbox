@@ -135,7 +135,7 @@ function EmailDetail({ email, onClose, onBack }) {
         <div className="email-detail-content">
           <div 
             className="email-body"
-            dangerouslySetInnerHTML={{ __html: email.body || '(No Content)' }}
+            dangerouslySetInnerHTML={{ __html: email.body_html || '(No Content)' }}
           />
         </div>
 

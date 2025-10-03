@@ -52,7 +52,8 @@ function AccountSwitcher({ isOpen, onClose }) {
 
   const handleAddAccount = () => {
     onClose();
-    navigate('/login');
+    // Add query parameter to indicate we're adding a new account
+    navigate('/login?addAccount=true');
   };
 
   if (!isOpen) return null;

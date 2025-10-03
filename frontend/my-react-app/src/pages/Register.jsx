@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useAuth } from '../hooks/useAuth';
 import { addAccountToList, setActiveAccount } from '../store/slices/accountsSlice';
@@ -8,6 +8,8 @@ import './Auth.css';
 function Register() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const isAddingAccount = searchParams.get('addAccount') === 'true';
   const { register, isRegistering, registerError, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
@@ -17,12 +19,12 @@ function Register() {
   });
   const [errors, setErrors] = useState({});
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but not when adding a new account)
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isAddingAccount) {
       navigate('/home');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, isAddingAccount]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -189,7 +191,7 @@ function Register() {
         </form>
 
         <div className="auth-switch">
-          Already have an account? <Link to="/login">Login</Link>
+          Already have an account? <Link to={isAddingAccount ? "/login?addAccount=true" : "/login"}>Login</Link>
         </div>
       </div>
     </div>
