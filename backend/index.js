@@ -1,10 +1,11 @@
 const express = require("express");
 const fetchEmails = require("./utils/fetchemail");
 const esClient = require("./utils/esClient");
-const {classifyEmail, loadClassifier, cleanEmailBody} = require("./utils/classifier");
+const { classifyEmail, loadClassifier } = require("./utils/classifier");
 const cors = require("cors");
 const crypto = require("crypto");
 const { htmlToText } = require("html-to-text");
+const Account = require("./models/Account"); // Mongo model
 
 require("dotenv").config();
 
@@ -13,7 +14,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-// --- Ensure "emails" index exists in Elasticsearch ---
+
+// --- Elasticsearch index setup ---
 async function ensureIndex() {
   const exists = await esClient.indices.exists({ index: "emails" });
   if (!exists) {
@@ -37,16 +39,10 @@ async function ensureIndex() {
   }
 }
 
-// --- Initialize server ---
+// --- Classifier setup ---
 let classifierReady = false;
-
 (async () => {
-  try {
-    await ensureIndex();
-  } catch (err) {
-    console.error("❌ Error ensuring index:", err.message);
-  }
-  
+  await ensureIndex();
   try {
     await loadClassifier();
     classifierReady = true;
@@ -56,57 +52,43 @@ let classifierReady = false;
   }
 })();
 
-// --- API: Fetch emails, classify, index ---
-app.get("/emails", async (req, res) => {
+// --- Track last UID for logged-in account ---
+let lastUid = null;
+let activeAccount = null; // set when user logs in
+
+// --- Function to fetch and index new emails ---
+async function pollNewEmails() {
+  if (!activeAccount) return; // no logged-in account
+
   try {
-    const emails = await fetchEmails();
-    if (!emails || emails.length === 0) return res.json({ emails: [] });
-
-    const enrichedEmails = emails.map((email) => {
-      try {
-        // Convert HTML body to plain text
-        const bodyHtml = email.body || "";
-        const bodyText = htmlToText(bodyHtml, {
-          wordwrap: 130,
-          ignoreHref: true,
-          ignoreImage: true,
-        }).replace(/\s+/g, " ").trim();
-        
-        // Create email object with text body for classification
-        const emailForClassification = {
-          ...email,
-          body: bodyText
-        };
-        
-        // Only classify if classifier is ready
-        let label = "Unclassified";
-        if (classifierReady) {
-          try {
-            label = classifyEmail(emailForClassification);
-          } catch (classifyErr) {
-            console.warn(`⚠️ Classification failed for "${email.subject}":`, classifyErr.message);
-          }
-        }
-        
-        const emailId = email.messageId || crypto.createHash("md5").update((email.subject || "") + (email.date || "")).digest("hex");
-
-        return {
-          ...email,
-          _id: emailId,
-          body_html: bodyHtml,
-          body_text: bodyText,
-          label,
-        };
-      } catch (err) {
-        console.error(`❌ Error processing email "${email.subject || 'Unknown'}":`, err.message);
-        return null;
-      }
+    const { emails, lastUid: newUid } = await fetchEmails({
+      imap_user: activeAccount.imap_user,
+      imap_pass: activeAccount.imap_pass,
+      lastUid,
     });
 
-    const validEmails = enrichedEmails.filter((e) => e !== null);
+    lastUid = newUid;
 
-    if (validEmails.length > 0) {
-      const bulkOps = validEmails.flatMap((email) => [
+    const enrichedEmails = emails.map((email) => {
+      const bodyHtml = email.body || "";
+      const bodyText = htmlToText(bodyHtml, { wordwrap: 130, ignoreHref: true, ignoreImage: true }).replace(/\s+/g, " ").trim();
+
+      let label = "Unclassified";
+      if (classifierReady) {
+        try {
+          label = classifyEmail({ ...email, body: bodyText });
+        } catch (err) {
+          console.warn(`⚠️ Classification failed for "${email.subject}": ${err.message}`);
+        }
+      }
+
+      const emailId = crypto.createHash("md5").update((email.subject || "") + (email.date || "")).digest("hex");
+
+      return { ...email, _id: emailId, body_html: bodyHtml, body_text: bodyText, label };
+    });
+
+    if (enrichedEmails.length > 0) {
+      const bulkOps = enrichedEmails.flatMap(email => [
         { index: { _index: "emails", _id: email._id } },
         {
           from: email.from,
@@ -116,19 +98,45 @@ app.get("/emails", async (req, res) => {
           date: email.date,
           messageId: email.messageId,
           label: email.label,
-        },
+        }
       ]);
 
       await esClient.bulk({ refresh: true, body: bulkOps });
-      console.log(`✅ Indexed ${validEmails.length} emails into Elasticsearch`);
+      console.log(`✅ Indexed ${enrichedEmails.length} new emails for ${activeAccount.imap_user}`);
     }
-
-    res.json({ emails: validEmails });
   } catch (err) {
-    console.error("❌ Failed to fetch/classify/index emails:", err);
-    res.status(500).json({ error: "Failed to fetch emails" });
+    console.error("❌ Failed to poll new emails:", err.message);
   }
+}
+
+// --- API: Set active account (simulate login) ---
+// --- API: Create or switch active account ---
+app.post("/login", async (req, res) => {
+  const { imap_user, imap_pass } = req.body;
+  if (!imap_user || !imap_pass) return res.status(400).json({ error: "imap_user and imap_pass required" });
+
+  let account = await Account.findOne({ imap_user });
+  
+  if (!account) {
+    account = await Account.create({ imap_user, imap_pass });
+    console.log(`✅ Created new account for ${imap_user}`);
+  } else {
+    console.log(`✅ Using existing account for ${imap_user}`);
+  }
+
+  // Set as active account for polling
+  activeAccount = account;
+  lastUid = null; // reset UID to fetch incrementally from the latest
+
+  res.json({ message: `Active account set to ${imap_user}`, account });
+
+  // Start polling for this account immediately
+  pollNewEmails();
 });
+
+
+// Poll every 1 minute for new emails
+setInterval(pollNewEmails, 60 * 1000);
 
 // --- API: Search emails ---
 app.get("/search", async (req, res) => {
@@ -141,20 +149,50 @@ app.get("/search", async (req, res) => {
       query: {
         multi_match: {
           query: q,
-          fields: ["from", "subject", "body_text", "label"], // Search in plain text, not HTML
+          fields: ["from", "subject", "body_text", "label"],
           fuzziness: "AUTO",
         },
       },
     });
 
-    const hits = result.hits.hits.map((hit) => hit._source);
+    const hits = result.hits.hits.map(hit => hit._source);
     res.json({ emails: hits });
   } catch (err) {
-    console.error("❌ Search failed:", err);
+    console.error("❌ Search failed:", err.message);
     res.status(500).json({ error: "Search failed" });
   }
 });
 
-app.listen(3000, () => {
-  console.log("🚀 Server running on http://localhost:3000");
+app.get("/accounts", async (req, res) => {
+  try {
+    const accounts = await Account.find(); // only send imap_user
+    res.json({ accounts });
+  } catch (err) {
+    console.error("❌ Failed to fetch accounts:", err.message);
+    res.status(500).json({ error: "Failed to fetch accounts" });
+  }
 });
+app.post("/switch-account", async (req, res) => {
+  const { accountId } = req.body;
+  if (!accountId) return res.status(400).json({ error: "accountId is required" });
+
+  try {
+    const account = await Account.findById(accountId);
+    if (!account) return res.status(404).json({ error: "Account not found" });
+
+    // Set as active account for incremental polling
+    activeAccount = account;
+    lastUid = null; // reset UID to fetch incrementally
+    console.log(`✅ Switched to account: ${account.imap_user}`);
+
+    // Immediately poll for new emails for this account
+    pollNewEmails();
+
+    res.json({ message: `Active account set to ${account.imap_user}`, account });
+  } catch (err) {
+    console.error("❌ Failed to switch account:", err.message);
+    res.status(500).json({ error: "Failed to switch account" });
+  }
+});
+
+app.listen(3000, () => console.log("🚀 Server running on http://localhost:3000"));
