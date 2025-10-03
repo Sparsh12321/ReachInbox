@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 
-function EmailList({ emails, selectedEmail, onSelectEmail }) {
+function EmailList({ emails, selectedEmail, onSelectEmail, onRefresh }) {
   const [selectedEmails, setSelectedEmails] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -62,6 +63,16 @@ function EmailList({ emails, selectedEmail, onSelectEmail }) {
     return text.length > maxLength ? text.substring(0, maxLength).trim() + '…' : text;
   };
 
+  const handleRefreshClick = async () => {
+    if (isRefreshing || !onRefresh) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="email-list">
       <div className="email-list-header">
@@ -72,7 +83,12 @@ function EmailList({ emails, selectedEmail, onSelectEmail }) {
             onChange={handleSelectAll}
             className="email-checkbox"
           />
-          <button className="action-btn" title="Refresh">
+          <button 
+            className={`action-btn ${isRefreshing ? 'refreshing' : ''}`} 
+            title="Refresh" 
+            onClick={handleRefreshClick}
+            disabled={isRefreshing}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="23 4 23 10 17 10"></polyline>
               <polyline points="1 20 1 14 7 14"></polyline>

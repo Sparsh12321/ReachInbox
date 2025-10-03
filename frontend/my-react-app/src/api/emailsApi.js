@@ -28,5 +28,11 @@ export const emailsApi = {
       return response.data.emails || [];
     }
   },
+
+  // Trigger backend email sync (syncs IMAP and updates classifiers)
+  triggerRefresh: async (accountId) => {
+    const response = await axios.post(`${API_BASE_URL}/emails/refresh`, { accountId });
+    return response.data;
+  },
 };
 

@@ -1,5 +1,10 @@
 // components/Loading.js
 export default function Loading({ message = "Loading..." }) {
-  return <div className="loading-container"><p>{message}</p></div>;
+  return (
+    <div className="loading-state">
+      <div className="loading-spinner"></div>
+      <p className="loading-message">{message}</p>
+    </div>
+  );
 }
 

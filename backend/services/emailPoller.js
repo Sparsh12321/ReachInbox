@@ -2,7 +2,7 @@ const fetchEmails = require("../utils/fetchemail");
 const esClient = require("../config/esClient");
 const crypto = require("crypto");
 const { htmlToText } = require("html-to-text");
-const { classifyEmail, classifierReady } = require("./classifier");
+const { classifyEmail } = require("./classifier");
 const Account = require("../models/user");
 
 // Track active account
@@ -33,10 +33,10 @@ async function pollNewEmails() {
       const bodyText = htmlToText(bodyHtml, { wordwrap: 130, ignoreHref: true, ignoreImage: true }).replace(/\s+/g, " ").trim();
 
       let label = "Unclassified";
-      if (classifierReady) {
-        try {
-          label = classifyEmail({ ...email, body: bodyText });
-        } catch {}
+      try {
+        label = classifyEmail({ ...email, body: bodyText });
+      } catch (err) {
+        console.warn(`⚠️ Classification failed for "${email.subject}": ${err.message}`);
       }
 
       const emailId = crypto.createHash("md5").update((email.subject || "") + (email.date || "") + activeAccount.imap_user).digest("hex");
@@ -55,10 +55,26 @@ async function pollNewEmails() {
     if (enrichedEmails.length > 0) {
       const bulkOps = enrichedEmails.flatMap(email => [
         { index: { _index: "emails", _id: email._id } },
-        { ...email }
+        {
+          from: email.from,
+          subject: email.subject,
+          body_html: email.body_html,
+          body_text: email.body_text,
+          date: email.date,
+          messageId: email.messageId,
+          label: email.label,
+          account_id: email.account_id,
+          imap_user: email.imap_user
+        }
       ]);
 
-      await esClient.bulk({ refresh: true, body: bulkOps });
+      const bulkResponse = await esClient.bulk({ refresh: true, operations: bulkOps });
+      if (bulkResponse.errors) {
+        console.error("❌ Some emails failed to index:");
+        bulkResponse.items.filter(item => item.index?.error).forEach(item => {
+          console.error(JSON.stringify(item.index.error, null, 2));
+        });
+      }
       console.log(`✅ Indexed ${enrichedEmails.length} emails for ${activeAccount.imap_user}`);
     }
   } catch (err) {

@@ -67,7 +67,13 @@ async function pollNewEmails({
         }
       ]);
 
-      await esClient.bulk({ refresh: true, body: bulkOps });
+      const bulkResponse = await esClient.bulk({ refresh: true, operations: bulkOps });
+      if (bulkResponse.errors) {
+        console.error("❌ Some emails failed to index:");
+        bulkResponse.items.filter(item => item.index?.error).forEach(item => {
+          console.error(JSON.stringify(item.index.error, null, 2));
+        });
+      }
       console.log(`✅ Indexed ${enrichedEmails.length} new emails for ${activeAccount.imap_user}`);
     } else {
       console.log(`📭 No new emails found for ${activeAccount.imap_user}`);
