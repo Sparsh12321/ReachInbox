@@ -18,7 +18,7 @@ export const accountsApi = {
 
   // Switch to a different account
   switchAccount: async (accountId) => {
-    const response = await axios.post(`${API_BASE_URL}/switch-account`, {
+    const response = await axios.post(`${API_BASE_URL}/accounts/switch-account`, {
       accountId
     });
     return {
@@ -29,7 +29,7 @@ export const accountsApi = {
 
   // Add new account (same as login)
   addAccount: async (credentials) => {
-    const response = await axios.post(`${API_BASE_URL}/login`, {
+    const response = await axios.post(`/auth/login`, {
       imap_user: credentials.email,
       imap_pass: credentials.password
     });

@@ -6,7 +6,7 @@ const API_BASE_URL = 'http://localhost:3000';
 export const authApi = {
   // Login user with IMAP credentials
   login: async (credentials) => {
-    const response = await axios.post(`${API_BASE_URL}/login`, {
+    const response = await axios.post(`${API_BASE_URL}/auth/login`, {
       imap_user: credentials.email,
       imap_pass: credentials.password
     });
@@ -24,7 +24,7 @@ export const authApi = {
 
   // Register user (same as login for IMAP)
   register: async (userData) => {
-    const response = await axios.post(`${API_BASE_URL}/login`, {
+    const response = await axios.post(`${API_BASE_URL}/auth/login`, {
       imap_user: userData.email,
       imap_pass: userData.password
     });

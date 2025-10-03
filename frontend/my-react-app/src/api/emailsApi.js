@@ -15,7 +15,7 @@ export const emailsApi = {
   // Get all emails (search with wildcard)
   getAllEmails: async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/search`, {
+      const response = await axios.get(`${API_BASE_URL}/emails/search`, {
         params: { q: '*' }
       });
       return response.data.emails || [];

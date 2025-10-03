@@ -1,6 +1,17 @@
 import React from 'react';
-
+import { useState } from 'react';
+import ReplyModal from "./ReplyModal";
+import useReplyLogic from "../hooks/useReplyLogic";
 function EmailDetail({ email, onClose, onBack }) {
+  const {
+    message,
+    suggestion,
+    setMessage,
+    handleAISuggest,
+    handleInsertSuggestion,
+    handleSend,
+  } = useReplyLogic(email?.body_text || "");
+   const [isReplyOpen, setIsReplyOpen] = useState(false);
   if (!email) {
     return (
       <div className="email-detail-empty">
@@ -140,21 +151,31 @@ function EmailDetail({ email, onClose, onBack }) {
         </div>
 
         <div className="email-detail-footer">
-          <button className="reply-btn">
+          <button  type="button"className="reply-btn " onClick={() => setIsReplyOpen(true)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 14 4 9 9 4"></polyline>
               <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
             </svg>
             <span>Reply</span>
           </button>
-          <button className="reply-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="15 14 20 9 15 4"></polyline>
-              <path d="M4 20v-7a4 4 0 0 1 4-4h12"></path>
-            </svg>
-            <span>Forward</span>
-          </button>
+        
         </div>
+                {isReplyOpen && (
+          <ReplyModal 
+            email={email} 
+            isOpen={isReplyOpen} 
+            message={message}
+            suggestion={suggestion}
+            onMessageChange={setMessage}
+            onAISuggest={handleAISuggest}
+            onInsertSuggestion={handleInsertSuggestion}
+            onSend={() => handleSend(
+              (msg) => { console.log("Replying to:", email.from, "Message:", msg); },
+              () => setIsReplyOpen(false)
+            )}
+            onClose={() => setIsReplyOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

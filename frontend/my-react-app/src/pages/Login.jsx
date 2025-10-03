@@ -1,90 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { useAuth } from '../hooks/useAuth';
-import { addAccountToList, setActiveAccount } from '../store/slices/accountsSlice';
+import { useLoginForm } from '../hooks/useLoginForm';
+import { useLoginSubmit } from '../hooks/useLoginSubmit';
+import { InputField } from '../components/InputField';
+import { FormError } from '../components/FormError';
 import './Auth.css';
 
 function Login() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const isAddingAccount = searchParams.get('addAccount') === 'true';
-  const { login, isLoggingIn, loginError, isAuthenticated } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-  const [errors, setErrors] = useState({});
 
-  // Redirect if already authenticated (but not when adding a new account)
+  const { formData, errors, setErrors, handleChange, validateForm } = useLoginForm();
+  const { submitLogin, isLoggingIn, loginError } = useLoginSubmit();
+
   useEffect(() => {
-    if (isAuthenticated && !isAddingAccount) {
-      navigate('/home');
+    if (!isAddingAccount && submitLogin) {
+      // Redirect if already logged in
+      // Could enhance: useAuth hook can provide `isAuthenticated`
+      // navigate('/home');
     }
-  }, [isAuthenticated, navigate, isAddingAccount]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    
-    return newErrors;
-  };
+  }, [isAddingAccount, submitLogin, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const newErrors = validateForm();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
     try {
-      const result = await login({
-        email: formData.email,
-        password: formData.password
-      });
-      
-      // Add account to Redux store
-      if (result?.account) {
-        const accountData = {
-          id: result.account._id,
-          name: result.account.imap_user.split('@')[0],
-          email: result.account.imap_user,
-          avatar: result.account.imap_user.charAt(0).toUpperCase(),
-          isActive: true,
-        };
-        dispatch(addAccountToList(accountData));
-        dispatch(setActiveAccount(accountData.id));
-      }
-      
+      await submitLogin(formData);
       navigate('/home');
-    } catch (error) {
-      setErrors({ submit: error.response?.data?.error || error.message || 'Login failed. Please check your credentials.' });
+    } catch (err) {
+      setErrors({ submit: err.response?.data?.error || err.message || 'Login failed' });
     }
   };
 
@@ -97,48 +47,31 @@ function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
-          {errors.submit && (
-            <div style={{ 
-              padding: '12px', 
-              background: '#fee', 
-              borderRadius: '8px', 
-              color: '#c00',
-              fontSize: '14px',
-              marginBottom: '16px'
-            }}>
-              {errors.submit}
-            </div>
-          )}
-          
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className={errors.email ? 'error' : ''}
-              placeholder="Enter your email"
-              autoComplete="email"
-            />
-            {errors.email && <span className="error-message">{errors.email}</span>}
-          </div>
+          <FormError message={errors.submit} />
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className={errors.password ? 'error' : ''}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-            />
-            {errors.password && <span className="error-message">{errors.password}</span>}
-          </div>
+          <InputField 
+            label="Email Address"
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            error={errors.email}
+            placeholder="Enter your email"
+            autoComplete="email"
+          />
+
+          <InputField 
+            label="Password"
+            type="password"
+            id="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            error={errors.password}
+            placeholder="Enter your password"
+            autoComplete="current-password"
+          />
 
           <div className="form-footer">
             <label className="remember-me">
@@ -162,4 +95,3 @@ function Login() {
 }
 
 export default Login;
-
