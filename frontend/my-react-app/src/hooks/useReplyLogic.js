@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 export default function useReplyLogic(bodyText) {
   const [message, setMessage] = useState("");
   const [suggestion, setSuggestion] = useState("");
-  const ai = new GoogleGenAI({ apiKey: "AIzaSyD2Ym6lEgs_K1cFNTIeDlWeJh2iL5FN1-E" });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_GEMINI_KEY });
 
   const handleAISuggest = async () => {
     if (!bodyText) return;
